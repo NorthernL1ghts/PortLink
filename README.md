@@ -73,7 +73,7 @@ Contributions are welcome! To contribute to PortLink, please follow these steps:
 4. Push your changes to your fork.
 5. Submit a pull request.
 
-Please refer to our [Code of Conduct](.github/ISSUE_TEMPLATE/CODE_OF_CONDUCT.md) for guidelines on contributing to this project.
+Please refer to our [Code of Conduct](CODE_OF_CONDUCT.md) for guidelines on contributing to this project.
 
 ## Reporting Bugs
 
