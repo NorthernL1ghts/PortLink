@@ -1,0 +1,52 @@
+# EditorConfig helps developers define and maintain consistent coding styles
+# across various editors and IDEs.
+
+# Top-most EditorConfig file
+root = true
+
+# C++ files
+[*.cpp]
+indent_style = space      # Use spaces for indentation
+indent_size = 4           # Set the indentation to 4 spaces
+tab_width = 4             # Tab width (for visual consistency)
+end_of_line = lf          # Use LF (Line Feed) for line endings
+charset = utf-8           # Set the character set to UTF-8
+trim_trailing_whitespace = true  # Remove trailing whitespaces
+insert_final_newline = true     # Ensure a final newline at the end of file
+
+# CMakeLists.txt files
+[*.cmake]
+indent_style = space
+indent_size = 2
+tab_width = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# C Header files
+[*.h]
+indent_style = space
+indent_size = 4
+tab_width = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Visual Studio Code workspace settings
+[vscode/*]
+indent_style = space
+indent_size = 2
+tab_width = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# All text files (this applies to most non-source files)
+[*]
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true

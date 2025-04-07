@@ -1,0 +1,17 @@
+# Ignore Visual Studio-related directories
+*vs/
+*vscode/
+
+# Ignore directories generated during the build process
+Binaries/
+Intermediates/
+x64/
+build/
+
+# Ignore temporary files and system files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.DS_Store
+Thumbs.db
