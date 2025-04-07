@@ -1,71 +1,149 @@
-#include <windows.h>
+#define UNICODE
+#define _UNICODE
 
-// Window procedure function
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-	switch (msg)
-	{
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		return 0;
+#include <windows.h>
+#include <dshow.h>
+#include <vector>
+#include <string>
+
+#pragma comment(lib, "strmiids.lib")
+
+// Global variables
+HWND hWndButton;
+std::vector<std::wstring> webcamNames;
+IGraphBuilder* pGraph = nullptr;
+IMediaControl* pMediaControl = nullptr;
+IBaseFilter* pCaptureFilter = nullptr;
+
+// Function to enumerate webcams using DirectShow
+void EnumerateWebcams() {
+	webcamNames.clear();
+	ICreateDevEnum* pDevEnum = nullptr;
+	IEnumMoniker* pEnum = nullptr;
+
+	if (SUCCEEDED(CoCreateInstance(CLSID_SystemDeviceEnum, nullptr, CLSCTX_INPROC_SERVER, IID_ICreateDevEnum, (void**)&pDevEnum))) {
+		if (SUCCEEDED(pDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pEnum, 0)) && pEnum) {
+			IMoniker* pMoniker = nullptr;
+			while (pEnum->Next(1, &pMoniker, nullptr) == S_OK) {
+				IPropertyBag* pBag;
+				if (SUCCEEDED(pMoniker->BindToStorage(nullptr, nullptr, IID_IPropertyBag, (void**)&pBag))) {
+					VARIANT varName;
+					VariantInit(&varName);
+					if (SUCCEEDED(pBag->Read(L"FriendlyName", &varName, nullptr))) {
+						webcamNames.push_back(varName.bstrVal);
+					}
+					VariantClear(&varName);
+					pBag->Release();
+				}
+				pMoniker->Release();
+			}
+			pEnum->Release();
+		}
+		pDevEnum->Release();
 	}
-	return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
-// WindowSpecification struct to hold window properties
-struct WindowSpecification
-{
-	const char* title;
-	int width;
-	int height;
-};
+// Function to open the first available webcam using DirectShow
+bool OpenWebcam(HWND hWnd) {
+	HRESULT hr = CoCreateInstance(CLSID_FilterGraph, nullptr, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void**)&pGraph);
+	if (FAILED(hr)) return false;
 
-int main()
-{
-	// Step 1: Define window specifications using the struct
-	const WindowSpecification windowSpec = { "PortLink", 800, 600 };
+	ICreateDevEnum* pDevEnum = nullptr;
+	hr = CoCreateInstance(CLSID_SystemDeviceEnum, nullptr, CLSCTX_INPROC_SERVER, IID_ICreateDevEnum, (void**)&pDevEnum);
+	if (FAILED(hr)) return false;
 
-	// Step 2: Define the window class
-	const char WindowClassName[] = "MainWindowClass";
+	IEnumMoniker* pEnum = nullptr;
+	hr = pDevEnum->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &pEnum, 0);
+	if (FAILED(hr) || !pEnum) return false;
 
-	WNDCLASS windowClass = {};
-	windowClass.lpfnWndProc = WindowProc;          // Set the window procedure function
-	windowClass.hInstance = GetModuleHandle(nullptr);  // Application instance handle
-	windowClass.lpszClassName = WindowClassName;   // Window class name
-	windowClass.hCursor = LoadCursor(nullptr, IDC_ARROW); // Default cursor
+	IMoniker* pMoniker = nullptr;
+	if (pEnum->Next(1, &pMoniker, nullptr) == S_OK) {
+		hr = pMoniker->BindToObject(nullptr, nullptr, IID_IBaseFilter, (void**)&pCaptureFilter);
+		if (SUCCEEDED(hr)) {
+			pGraph->AddFilter(pCaptureFilter, L"Video Capture");
+		}
+	}
 
-	// Register the window class
-	if (!RegisterClass(&windowClass))
-		return 0;
+	pMoniker->Release();
+	pEnum->Release();
+	pDevEnum->Release();
 
-	// Step 3: Create the window using values from the struct
-	HWND hwnd = CreateWindowEx(
-		0,                                    // Optional window styles
-		WindowClassName,                      // Window class name
-		windowSpec.title,                     // Window title from struct ("PortLink")
-		WS_OVERLAPPEDWINDOW,                  // Window style
-		CW_USEDEFAULT, CW_USEDEFAULT,         // Position (default)
-		windowSpec.width, windowSpec.height,  // Size (width, height)
-		nullptr,                              // Parent window
-		nullptr,                              // Menu
-		windowClass.hInstance,                // Instance handle
-		nullptr                               // Additional application data
-	);
+	// Add the video renderer
+	IBaseFilter* pRenderer = nullptr;
+	hr = CoCreateInstance(CLSID_VideoRenderer, nullptr, CLSCTX_INPROC_SERVER, IID_IBaseFilter, (void**)&pRenderer);
+	if (FAILED(hr)) return false;
 
-	if (hwnd == nullptr)
-		return 0;
+	pGraph->AddFilter(pRenderer, L"Video Renderer");
 
-	// Step 4: Show and update the window
-	ShowWindow(hwnd, SW_SHOWNORMAL);
-	UpdateWindow(hwnd);
+	// Connect the webcam to the renderer
+	ICaptureGraphBuilder2* pCaptureGraph = nullptr;
+	hr = CoCreateInstance(CLSID_CaptureGraphBuilder2, nullptr, CLSCTX_INPROC_SERVER, IID_ICaptureGraphBuilder2, (void**)&pCaptureGraph);
+	if (FAILED(hr)) return false;
 
-	// Step 5: Main message loop
-	MSG msg = {};
-	while (GetMessage(&msg, nullptr, 0, 0))
-	{
+	pCaptureGraph->SetFiltergraph(pGraph);
+	hr = pCaptureGraph->RenderStream(&PIN_CATEGORY_PREVIEW, &MEDIATYPE_Video, pCaptureFilter, nullptr, pRenderer);
+	if (FAILED(hr)) return false;
+
+	// Set the rendering window
+	IVideoWindow* pVideoWindow = nullptr;
+	pGraph->QueryInterface(IID_IVideoWindow, (void**)&pVideoWindow);
+	pVideoWindow->put_Owner((OAHWND)hWnd);
+	pVideoWindow->put_WindowStyle(WS_CHILD | WS_CLIPSIBLINGS);
+	pVideoWindow->SetWindowPosition(0, 0, 400, 300);
+
+	// Start streaming
+	pGraph->QueryInterface(IID_IMediaControl, (void**)&pMediaControl);
+	pMediaControl->Run();
+
+	return true;
+}
+// Button click callback
+void OnButtonClick(HWND hWnd) {
+	if (OpenWebcam(hWnd)) {
+		MessageBoxW(hWnd, L"Webcam Opened Successfully!", L"PortLink", MB_OK);
+	}
+	else {
+		MessageBoxW(hWnd, L"Failed to Open Webcam", L"PortLink", MB_OK);
+	}
+}
+
+// Window procedure
+LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	switch (uMsg) {
+	case WM_COMMAND:
+		if ((HWND)lParam == hWndButton) OnButtonClick(hWnd);
+		break;
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		break;
+	default:
+		return DefWindowProc(hWnd, uMsg, wParam, lParam);
+	}
+	return 0;
+}
+
+// Main entry point
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLine, int nCmdShow) {
+	CoInitialize(nullptr);
+
+	WNDCLASS wc = { 0 };
+	wc.lpfnWndProc = WindowProc;
+	wc.hInstance = hInstance;
+	wc.lpszClassName = L"PortLinkWindowClass";
+	RegisterClass(&wc);
+
+	HWND hWnd = CreateWindowExW(0, L"PortLinkWindowClass", L"PortLink - Webcam Finder", WS_OVERLAPPEDWINDOW,
+		CW_USEDEFAULT, CW_USEDEFAULT, 400, 300, nullptr, nullptr, hInstance, nullptr);
+
+	hWndButton = CreateWindowW(L"BUTTON", L"Find Webcam", WS_VISIBLE | WS_CHILD, 130, 100, 140, 30, hWnd, nullptr, hInstance, nullptr);
+
+	ShowWindow(hWnd, nCmdShow);
+	MSG msg;
+	while (GetMessage(&msg, nullptr, 0, 0)) {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
 
+	CoUninitialize();
 	return 0;
 }
