@@ -14,6 +14,7 @@ std::vector<std::wstring> webcamNames;
 IGraphBuilder* pGraph = nullptr;
 IMediaControl* pMediaControl = nullptr;
 IBaseFilter* pCaptureFilter = nullptr;
+bool running = true;
 
 // Function to enumerate available webcams
 void EnumerateAvailableWebcams() {
@@ -110,6 +111,27 @@ void HandleButtonClick(HWND hWnd) {
     }
 }
 
+// Function to listen for a hotkey press and terminate the program
+DWORD WINAPI TerminateOnHotkey(LPVOID lpParam) {
+    HWND hWnd = (HWND)lpParam;
+
+    while (running) {
+        if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {  // ESC key detected
+            running = false;
+
+            // Ensure the window is destroyed
+            PostMessage(hWnd, WM_CLOSE, 0, 0);
+
+            // End the application
+            ExitProcess(0);  // Completely terminates all threads and execution
+
+            break;
+        }
+        Sleep(100);  // Prevent excessive CPU usage
+    }
+    return 0;
+}
+
 // Window procedure
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
@@ -117,6 +139,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         if ((HWND)lParam == hWndButton) HandleButtonClick(hWnd);
         break;
     case WM_DESTROY:
+        running = false;
         PostQuitMessage(0);
         break;
     default:
@@ -141,6 +164,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR lpCmdLin
     hWndButton = CreateWindowW(L"BUTTON", L"Start Webcam", WS_VISIBLE | WS_CHILD, 330, 250, 140, 30, hWnd, nullptr, hInstance, nullptr);
 
     ShowWindow(hWnd, nCmdShow);
+
+    // Start hotkey listener in a separate thread
+    CreateThread(nullptr, 0, TerminateOnHotkey, nullptr, 0, nullptr);
+
     MSG msg;
     while (GetMessage(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
