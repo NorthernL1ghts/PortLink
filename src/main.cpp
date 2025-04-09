@@ -9,7 +9,6 @@
 #pragma comment(lib, "strmiids.lib")
 
 // Global variables
-HWND h_ButtonStartWebcam;
 std::vector<std::wstring> g_WebcamNames;
 IGraphBuilder* g_GraphBuilder = nullptr;
 IMediaControl* g_MediaControl = nullptr;
@@ -98,14 +97,6 @@ bool StartWebcamPreview(HWND h_ParentWindow) {
     return true;
 }
 
-// Handle Start Webcam button click
-void OnStartWebcamClicked(HWND h_ParentWindow) {
-    if (StartWebcamPreview(h_ParentWindow))
-        MessageBoxW(h_ParentWindow, L"Webcam Opened Successfully!", L"PortLink", MB_OK);
-    else
-        MessageBoxW(h_ParentWindow, L"Failed to Open Webcam", L"PortLink", MB_OK);
-}
-
 // Monitor ESC key in background to close app
 DWORD WINAPI MonitorHotkeyExit(LPVOID p_Param) {
     HWND h_ParentWindow = (HWND)p_Param;
@@ -124,10 +115,6 @@ DWORD WINAPI MonitorHotkeyExit(LPVOID p_Param) {
 // Main window procedure
 LRESULT CALLBACK WindowProc(HWND h_Window, UINT u_Msg, WPARAM wParam, LPARAM lParam) {
     switch (u_Msg) {
-    case WM_COMMAND:
-        if ((HWND)lParam == h_ButtonStartWebcam)
-            OnStartWebcamClicked(h_Window);
-        break;
     case WM_DESTROY:
         g_IsRunning = false;
         PostQuitMessage(0);
@@ -142,34 +129,26 @@ int WINAPI wWinMain(HINSTANCE h_ApplicationInstance, HINSTANCE h_PreviousInstanc
     CoInitialize(nullptr);
 
     WNDCLASS windowClass = { 0 };
-    windowClass.lpfnWndProc = WindowProc;                 // long pointer to window procedure
+    windowClass.lpfnWndProc = WindowProc;
     windowClass.hInstance = h_ApplicationInstance;
     windowClass.lpszClassName = L"PortLinkWindowClass";
 
     RegisterClass(&windowClass);
 
     HWND h_MainWindow = CreateWindowExW(
-        0,                                  // Optional extended styles
-        L"PortLinkWindowClass",            // Window class name
-        L"PortLink - Webcam Viewer",       // Window title
-        WS_OVERLAPPEDWINDOW,               // Style
-
-        CW_USEDEFAULT, CW_USEDEFAULT,      // Position
-        800, 600,                          // Size
-
+        0,
+        L"PortLinkWindowClass",
+        L"PortLink - Webcam Viewer",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        800, 600,
         nullptr, nullptr, h_ApplicationInstance, nullptr
     );
 
-    h_ButtonStartWebcam = CreateWindowW(
-        L"BUTTON",                         // Predefined class
-        L"Start Webcam",                   // Button text
-        WS_VISIBLE | WS_CHILD,             // Styles
-        330, 250, 140, 30,                 // Position and size
-        h_MainWindow,                     // Parent window
-        nullptr, h_ApplicationInstance, nullptr
-    );
-
     ShowWindow(h_MainWindow, n_ShowCommand);
+
+    // Start webcam preview automatically
+    StartWebcamPreview(h_MainWindow);
 
     // Launch the hotkey ESC-monitoring thread
     CreateThread(nullptr, 0, MonitorHotkeyExit, h_MainWindow, 0, nullptr);
