@@ -29,11 +29,11 @@ void EnumerateWebcamDevices() {
             while (p_EnumMoniker->Next(1, &p_Moniker, nullptr) == S_OK) {
                 IPropertyBag* p_PropertyBag;
                 if (SUCCEEDED(p_Moniker->BindToStorage(nullptr, nullptr, IID_IPropertyBag, (void**)&p_PropertyBag))) {
-                    VARIANT var_Name;
-                    VariantInit(&var_Name);
-                    if (SUCCEEDED(p_PropertyBag->Read(L"FriendlyName", &var_Name, nullptr)))
-                        g_WebcamNames.push_back(var_Name.bstrVal);
-                    VariantClear(&var_Name);
+                    VARIANT variantName;
+                    VariantInit(&variantName);
+                    if (SUCCEEDED(p_PropertyBag->Read(L"FriendlyName", &variantName, nullptr)))
+                        g_WebcamNames.push_back(variantName.bstrVal);
+                    VariantClear(&variantName);
                     p_PropertyBag->Release();
                 }
                 p_Moniker->Release();
@@ -46,21 +46,21 @@ void EnumerateWebcamDevices() {
 
 // Initialize webcam capture and rendering
 bool StartWebcamPreview(HWND h_ParentWindow) {
-    HRESULT hr = CoCreateInstance(CLSID_FilterGraph, nullptr, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void**)&g_GraphBuilder);
-    if (FAILED(hr)) return false;
+    HRESULT handleResult = CoCreateInstance(CLSID_FilterGraph, nullptr, CLSCTX_INPROC_SERVER, IID_IGraphBuilder, (void**)&g_GraphBuilder);
+    if (FAILED(handleResult)) return false;
 
     ICreateDevEnum* p_DeviceEnumerator = nullptr;
-    hr = CoCreateInstance(CLSID_SystemDeviceEnum, nullptr, CLSCTX_INPROC_SERVER, IID_ICreateDevEnum, (void**)&p_DeviceEnumerator);
-    if (FAILED(hr)) return false;
+    handleResult = CoCreateInstance(CLSID_SystemDeviceEnum, nullptr, CLSCTX_INPROC_SERVER, IID_ICreateDevEnum, (void**)&p_DeviceEnumerator);
+    if (FAILED(handleResult)) return false;
 
     IEnumMoniker* p_EnumMoniker = nullptr;
-    hr = p_DeviceEnumerator->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &p_EnumMoniker, 0);
-    if (FAILED(hr) || !p_EnumMoniker) return false;
+    handleResult = p_DeviceEnumerator->CreateClassEnumerator(CLSID_VideoInputDeviceCategory, &p_EnumMoniker, 0);
+    if (FAILED(handleResult) || !p_EnumMoniker) return false;
 
     IMoniker* p_Moniker = nullptr;
     if (p_EnumMoniker->Next(1, &p_Moniker, nullptr) == S_OK) {
-        hr = p_Moniker->BindToObject(nullptr, nullptr, IID_IBaseFilter, (void**)&g_CaptureFilter);
-        if (SUCCEEDED(hr))
+        handleResult = p_Moniker->BindToObject(nullptr, nullptr, IID_IBaseFilter, (void**)&g_CaptureFilter);
+        if (SUCCEEDED(handleResult))
             g_GraphBuilder->AddFilter(g_CaptureFilter, L"Webcam Video Capture");
         p_Moniker->Release();
     }
@@ -70,19 +70,19 @@ bool StartWebcamPreview(HWND h_ParentWindow) {
 
     // Create and add video renderer
     IBaseFilter* p_VideoRenderer = nullptr;
-    hr = CoCreateInstance(CLSID_VideoRenderer, nullptr, CLSCTX_INPROC_SERVER, IID_IBaseFilter, (void**)&p_VideoRenderer);
-    if (FAILED(hr)) return false;
+    handleResult = CoCreateInstance(CLSID_VideoRenderer, nullptr, CLSCTX_INPROC_SERVER, IID_IBaseFilter, (void**)&p_VideoRenderer);
+    if (FAILED(handleResult)) return false;
 
     g_GraphBuilder->AddFilter(p_VideoRenderer, L"Video Renderer");
 
     // Setup capture graph
     ICaptureGraphBuilder2* p_CaptureGraphBuilder = nullptr;
-    hr = CoCreateInstance(CLSID_CaptureGraphBuilder2, nullptr, CLSCTX_INPROC_SERVER, IID_ICaptureGraphBuilder2, (void**)&p_CaptureGraphBuilder);
-    if (FAILED(hr)) return false;
+    handleResult = CoCreateInstance(CLSID_CaptureGraphBuilder2, nullptr, CLSCTX_INPROC_SERVER, IID_ICaptureGraphBuilder2, (void**)&p_CaptureGraphBuilder);
+    if (FAILED(handleResult)) return false;
 
     p_CaptureGraphBuilder->SetFiltergraph(g_GraphBuilder);
-    hr = p_CaptureGraphBuilder->RenderStream(&PIN_CATEGORY_PREVIEW, &MEDIATYPE_Video, g_CaptureFilter, nullptr, p_VideoRenderer);
-    if (FAILED(hr)) return false;
+    handleResult = p_CaptureGraphBuilder->RenderStream(&PIN_CATEGORY_PREVIEW, &MEDIATYPE_Video, g_CaptureFilter, nullptr, p_VideoRenderer);
+    if (FAILED(handleResult)) return false;
 
     // Setup video window
     IVideoWindow* p_VideoWindow = nullptr;
@@ -122,8 +122,8 @@ DWORD WINAPI MonitorHotkeyExit(LPVOID p_Param) {
 }
 
 // Main window procedure
-LRESULT CALLBACK WindowProc(HWND h_Window, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch (uMsg) {
+LRESULT CALLBACK WindowProc(HWND h_Window, UINT u_Msg, WPARAM wParam, LPARAM lParam) {
+    switch (u_Msg) {
     case WM_COMMAND:
         if ((HWND)lParam == h_ButtonStartWebcam)
             OnStartWebcamClicked(h_Window);
@@ -133,7 +133,7 @@ LRESULT CALLBACK WindowProc(HWND h_Window, UINT uMsg, WPARAM wParam, LPARAM lPar
         PostQuitMessage(0);
         break;
     default:
-        return DefWindowProc(h_Window, uMsg, wParam, lParam);
+        return DefWindowProc(h_Window, u_Msg, wParam, lParam);
     }
     return 0;
 }
